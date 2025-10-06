@@ -10,7 +10,7 @@ interface ContactMessage {
   subject?: string;
   message: string;
   createdAt?: any;
-  status?: string;
+  status?: string; // "Pending" | "Read" | "Replied"
   adminReply?: string;
   repliedBy?: string;
 }
@@ -21,21 +21,29 @@ const AdminMessages: React.FC = () => {
   const [replyText, setReplyText] = useState("");
   const [filter, setFilter] = useState<"all" | "pending" | "replied">("all");
   const [search, setSearch] = useState("");
-  const [viewingMessage, setViewingMessage] = useState<ContactMessage | null>(
-    null
-  );
+  const [viewingMessage, setViewingMessage] = useState<ContactMessage | null>(null);
 
+  // Fetch messages in real-time
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "contacts"), (snapshot) => {
-      const list: ContactMessage[] = snapshot.docs.map((d) => ({
+      let list: ContactMessage[] = snapshot.docs.map((d) => ({
         id: d.id,
         ...(d.data() as Omit<ContactMessage, "id">),
       }));
+
+      // Sort by createdAt (newest first)
+      list = list.sort((a, b) => {
+        const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+        const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+        return bTime - aTime; // newest first
+      });
+
       setMessages(list);
     });
     return () => unsub();
   }, []);
 
+  // Send reply
   const sendReply = async () => {
     if (!replying || !replyText.trim()) return;
 
@@ -70,12 +78,26 @@ const AdminMessages: React.FC = () => {
     }
   };
 
+  // Mark as read when viewing
+  const handleViewMessage = async (msg: ContactMessage) => {
+    setViewingMessage(msg);
+    if (!msg.status || msg.status === "Pending") {
+      try {
+        const ref = doc(db, "contacts", msg.id);
+        await updateDoc(ref, { status: "Read" });
+      } catch (err) {
+        console.error("Error marking as read:", err);
+      }
+    }
+  };
+
+  // Filtering + Searching
   const filteredMessages = messages.filter((msg) => {
     const matchFilter =
       filter === "all"
         ? true
         : filter === "pending"
-        ? !msg.status || msg.status === "Pending"
+        ? !msg.status || msg.status === "Pending" || msg.status === "Read"
         : msg.status === "Replied";
 
     const matchSearch = msg.email
@@ -134,52 +156,62 @@ const AdminMessages: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredMessages.map((msg) => (
-                <tr key={msg.id} className="border-t hover:bg-gray-50">
-                  <td className="p-3">{msg.name}</td>
-                  <td className="p-3">{msg.email}</td>
-                  <td className="p-3">{msg.subject}</td>
-                  <td className="p-3 max-w-xs">
-                    <p className="truncate max-w-[200px]">{msg.message}</p>
-                    <button
-                      onClick={() => setViewingMessage(msg)}
-                      className="text-blue-600 text-sm hover:underline"
-                    >
-                      View
-                    </button>
-                  </td>
-                  <td className="p-3">
-                    {msg.createdAt?.toDate
-                      ? msg.createdAt.toDate().toLocaleString()
-                      : "—"}
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        msg.status === "Replied"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}
-                    >
-                      {msg.status || "Pending"}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <button
-                      onClick={() => setReplying(msg)}
-                      className="px-4 py-1 text-sm font-medium rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-md transition"
-                    >
-                      Reply
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filteredMessages.map((msg) => {
+                const isUnread = !msg.status || msg.status === "Pending";
+                return (
+                  <tr
+                    key={msg.id}
+                    className={`border-t hover:bg-gray-50 transition ${
+                      isUnread ? "bg-blue-50 font-semibold" : ""
+                    }`}
+                  >
+                    <td className="p-3">{msg.name}</td>
+                    <td className="p-3">{msg.email}</td>
+                    <td className="p-3">{msg.subject}</td>
+                    <td className="p-3 max-w-xs">
+                      <p className="truncate max-w-[200px]">{msg.message}</p>
+                      <button
+                        onClick={() => handleViewMessage(msg)}
+                        className="text-blue-600 text-sm hover:underline"
+                      >
+                        View
+                      </button>
+                    </td>
+                    <td className="p-3">
+                      {msg.createdAt?.toDate
+                        ? msg.createdAt.toDate().toLocaleString()
+                        : "—"}
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                          msg.status === "Replied"
+                            ? "bg-green-100 text-green-700"
+                            : msg.status === "Read"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-yellow-100 text-yellow-700"
+                        }`}
+                      >
+                        {msg.status || "Pending"}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <button
+                        onClick={() => setReplying(msg)}
+                        className="px-4 py-1 text-sm font-medium rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:shadow-md transition"
+                      >
+                        Reply
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* Full Message Modal */}
+      {/* View Message Modal */}
       {viewingMessage && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-[500px] max-h-[80vh] overflow-y-auto p-6 animate-fadeIn">
