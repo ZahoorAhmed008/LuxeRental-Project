@@ -122,16 +122,6 @@ const RentConfirmationPage = () => {
       return;
     }
 
-    const today = new Date();
-    const selectedDate = new Date(formData.rentalStartDate);
-    const minDate = new Date();
-    minDate.setDate(today.getDate() + 4);
-
-    if (selectedDate < minDate) {
-      alert("Rental start date must be at least 4 days from today.");
-      return;
-    }
-
     if (!formData.agree) {
       alert("You must agree to the rental policies before proceeding.");
       return;
@@ -140,14 +130,12 @@ const RentConfirmationPage = () => {
     try {
       let screenshotBase64 = null;
 
-      // ✅ Card Payment Check
       if (formData.payment === "Card") {
         if (!screenshot) {
           alert("Please upload a payment screenshot for card payments.");
           return;
         }
 
-        // Safely convert to Base64
         screenshotBase64 = await getBase64(screenshot);
         if (!screenshotBase64) {
           alert("Error reading screenshot. Please re-upload.");
@@ -155,7 +143,6 @@ const RentConfirmationPage = () => {
         }
       }
 
-      // ✅ Order Data
       const orderData = {
         userId: user.uid,
         customer: formData.fullName,
@@ -177,7 +164,6 @@ const RentConfirmationPage = () => {
         createdAt: new Date().toISOString(),
       };
 
-      // ✅ Always add order
       await addOrder(orderData);
 
       alert("✅ Rental request sent! Waiting for admin approval.");
@@ -186,13 +172,6 @@ const RentConfirmationPage = () => {
       console.error("Error submitting order:", error);
       alert("❌ Something went wrong while submitting your order.");
     }
-  };
-
-  // ✅ Minimum Date (4 days ahead)
-  const getMinDate = () => {
-    const date = new Date();
-    date.setDate(date.getDate() + 4);
-    return date.toISOString().split("T")[0];
   };
 
   return (
@@ -312,13 +291,8 @@ const RentConfirmationPage = () => {
               value={formData.rentalStartDate}
               onChange={handleChange}
               required
-              min={getMinDate()}
               className="w-full border p-3 rounded"
             />
-            <p className="text-sm text-gray-600 mt-1">
-              Note: Please place your rental at least 4 days before the rental
-              start date.
-            </p>
 
             {rentalEndDate && (
               <input
@@ -362,12 +336,9 @@ const RentConfirmationPage = () => {
                 <li>Late fee: Rs. 1000 per day for the first 2 days.</li>
                 <li>After 3 days: Rs. 2000 per day until item is returned</li>
                 <li>
-                  Items not returned within 14 days will be charged full retail
-                  value
+                  Items not returned within 14 days will be charged full retail value
                 </li>
-                <li>
-                  Customers are not required to wash the clothes before returning
-                </li>
+                <li>Customers are not required to wash the clothes before returning</li>
               </ul>
 
               <label className="flex items-center mt-3">

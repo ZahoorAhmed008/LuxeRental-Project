@@ -11,23 +11,31 @@ import {
   Home,
   User,
   X,
+  AlertTriangle,
 } from "lucide-react";
+import { Order } from "../../context/OrderContext";
 
 const OrderDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [order, setOrder] = useState<any>(null);
+  const [order, setOrder] = useState<Order | null>(null);
   const [showImage, setShowImage] = useState(false);
 
   useEffect(() => {
     if (!id) return;
+
     const fetchOrder = async () => {
-      const ref = doc(db, "orders", id);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        setOrder({ id: snap.id, ...snap.data() });
+      try {
+        const ref = doc(db, "orders", id);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          setOrder({ id: snap.id, ...snap.data() } as Order);
+        }
+      } catch (error) {
+        console.error("Error fetching order:", error);
       }
     };
+
     fetchOrder();
   }, [id]);
 
@@ -35,9 +43,31 @@ const OrderDetails: React.FC = () => {
     return <div className="p-6 text-red-600">Loading order...</div>;
   }
 
+  // ✅ Fine Calculation
+  const calculateFine = (): number => {
+    if (
+      order.status !== "Accepted" ||
+      !order.rentalEndDate ||
+      isNaN(new Date(order.rentalEndDate).getTime())
+    ) {
+      return 0;
+    }
+
+    const today = new Date();
+    const end = new Date(order.rentalEndDate);
+    if (today > end) {
+      const diffDays = Math.floor(
+        (today.getTime() - end.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      return diffDays * 500;
+    }
+    return 0;
+  };
+
+  const fine = calculateFine();
+
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      {/* Back Button */}
       <button
         onClick={() => navigate(-1)}
         className="flex items-center gap-2 mb-6 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg transition"
@@ -46,9 +76,7 @@ const OrderDetails: React.FC = () => {
         Back
       </button>
 
-      {/* Order Card */}
       <div className="bg-white shadow-xl rounded-2xl overflow-hidden p-6">
-        {/* Product Image with Gradient Border */}
         {order.productImage && (
           <div className="flex justify-center mb-4">
             <div className="p-[2px] rounded-xl bg-gradient-to-r from-blue-600 to-purple-600">
@@ -61,37 +89,35 @@ const OrderDetails: React.FC = () => {
           </div>
         )}
 
-        {/* Product Title with Gradient Text */}
         <h2 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           {order.productTitle}
         </h2>
 
-        {/* Order Details Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-700">
-          <DetailItem icon={<User className="w-4 h-4" />} label="Customer" value={order.customer} />
-          <DetailItem icon={<Mail className="w-4 h-4" />} label="Email" value={order.email} />
-          <DetailItem icon={<Phone className="w-4 h-4" />} label="Mobile" value={order.mobile} />
-          <DetailItem icon={<MapPin className="w-4 h-4" />} label="City" value={order.city} />
-          <DetailItem icon={<Home className="w-4 h-4" />} label="Postal" value={order.postal} />
-          <DetailItem icon={<Home className="w-4 h-4" />} label="Address" value={order.address} />
+          <DetailItem icon={<User />} label="Customer" value={order.customer} />
+          <DetailItem icon={<Mail />} label="Email" value={order.email} />
+          <DetailItem icon={<Phone />} label="Mobile" value={order.mobile} />
+          <DetailItem icon={<MapPin />} label="City" value={order.city} />
+          <DetailItem icon={<Home />} label="Postal" value={order.postal} />
+          <DetailItem icon={<Home />} label="Address" value={order.address} />
 
           {order.rentalStartDate && (
             <DetailItem
-              icon={<CalendarDays className="w-4 h-4 text-blue-600" />}
+              icon={<CalendarDays className="text-blue-600" />}
               label="Rental Start"
               value={order.rentalStartDate}
             />
           )}
-
           {order.rentalEndDate && (
             <DetailItem
-              icon={<CalendarDays className="w-4 h-4 text-purple-600" />}
+              icon={<CalendarDays className="text-purple-600" />}
               label="Rental End"
               value={order.rentalEndDate}
             />
           )}
 
           <DetailItem label="Duration" value={order.duration} />
+
           <DetailItem
             label="Status"
             value={
@@ -99,26 +125,46 @@ const OrderDetails: React.FC = () => {
                 className={`px-3 py-1 rounded-full text-sm font-medium ${
                   order.status === "Pending"
                     ? "bg-yellow-100 text-yellow-700"
-                    : order.status === "Shipped"
+                    : order.status === "Accepted"
                     ? "bg-blue-100 text-blue-700"
-                    : "bg-green-100 text-green-700"
+                    : order.status.includes("Return")
+                    ? "bg-purple-100 text-purple-700"
+                    : "bg-gray-100 text-gray-700"
                 }`}
               >
                 {order.status}
               </span>
             }
           />
+
           <DetailItem label="Payment" value={order.paymentMethod} />
           <DetailItem
             label="Total Price"
-            value={<span className="font-bold text-green-600">Rs. {order.productPrice}</span>}
+            value={
+              <span className="font-bold text-green-600">
+                Rs. {order.productPrice}
+              </span>
+            }
           />
+
+          {/* ✅ Fine Section */}
+          {fine > 0 && (
+            <DetailItem
+              label="Fine"
+              value={
+                <span className="text-red-600 font-semibold flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> Rs. {fine}
+                </span>
+              }
+            />
+          )}
         </div>
 
-        {/* Payment Screenshot with Gradient Border */}
         {order.paymentScreenshot && (
           <div className="mt-6 text-center">
-            <h3 className="text-gray-700 font-semibold mb-2">Payment Screenshot</h3>
+            <h3 className="text-gray-700 font-semibold mb-2">
+              Payment Screenshot
+            </h3>
             <div className="p-[2px] rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 inline-block">
               <img
                 src={order.paymentScreenshot}
@@ -131,7 +177,6 @@ const OrderDetails: React.FC = () => {
         )}
       </div>
 
-      {/* Fullscreen Modal for Image */}
       {showImage && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
           <button
@@ -151,7 +196,6 @@ const OrderDetails: React.FC = () => {
   );
 };
 
-// Reusable Detail Item
 const DetailItem = ({
   icon,
   label,

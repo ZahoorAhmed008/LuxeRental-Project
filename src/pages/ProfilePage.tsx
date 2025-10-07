@@ -7,7 +7,20 @@ import {
   DollarSign,
   CalendarDays,
   RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
+
+interface Order {
+  id: string;
+  userId: string;
+  productTitle: string;
+  productImage?: string;
+  productPrice: number;
+  duration: string;
+  rentalStartDate?: string;
+  rentalEndDate?: string;
+  status: string;
+}
 
 const ProfilePage: React.FC = () => {
   const { orders, updateOrderStatus } = useOrders();
@@ -22,11 +35,39 @@ const ProfilePage: React.FC = () => {
     );
   }
 
-  const myOrders = orders.filter((o) => o.userId === user.uid);
+  // ✅ Filter orders safely
+  const myOrders: Order[] = (orders as Order[]).filter(
+    (o) => o.userId === user.uid
+  );
 
-  // Handle Return Request
+  // ✅ Fine Calculation Function
+  const calculateFine = (order: Order): number => {
+    if (
+      order.status !== "Accepted" ||
+      !order.rentalEndDate ||
+      isNaN(new Date(order.rentalEndDate).getTime())
+    ) {
+      return 0;
+    }
+
+    const today = new Date();
+    const end = new Date(order.rentalEndDate);
+    if (today > end) {
+      const diffDays = Math.floor(
+        (today.getTime() - end.getTime()) / (1000 * 60 * 60 * 24)
+      );
+      return diffDays * 500; // Rs.500/day fine
+    }
+    return 0;
+  };
+
+  // ✅ Handle Return Request
   const handleReturn = async (id: string) => {
-    await updateOrderStatus(id, "Return Pending");
+    try {
+      await updateOrderStatus(id, "Return Pending");
+    } catch (error) {
+      console.error("Error requesting return:", error);
+    }
   };
 
   return (
@@ -45,7 +86,7 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ✅ Tabs */}
       <div className="mb-6 flex gap-3">
         <button
           onClick={() => setActiveTab("rentals")}
@@ -59,7 +100,7 @@ const ProfilePage: React.FC = () => {
         </button>
       </div>
 
-      {/* Rentals with ShopPage Style */}
+      {/* ✅ Rentals Section */}
       {activeTab === "rentals" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {myOrders.length === 0 ? (
@@ -67,68 +108,78 @@ const ProfilePage: React.FC = () => {
               📦 You haven’t rented anything yet.
             </p>
           ) : (
-            myOrders.map((order) => (
-              <div
-                key={order.id}
-                className="rounded-2xl p-[2px] bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl transition duration-300"
-              >
-                <div className="bg-white rounded-2xl overflow-hidden flex flex-col h-full">
-                  {/* Product Image */}
-                  {order.productImage && (
-                    <div className="relative">
-                      <img
-                        src={order.productImage}
-                        alt={order.productTitle}
-                        className="w-full h-56 object-cover object-top hover:scale-105 transition-transform duration-500"
-                      />
-                      {/* Status Badge */}
-                      <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-medium bg-white/90 shadow">
-                        {order.status}
-                      </span>
-                    </div>
-                  )}
+            myOrders.map((order) => {
+              const fine = calculateFine(order);
 
-                  {/* Card Content */}
-                  <div className="p-5 flex flex-col flex-grow">
-                    <h2 className="text-lg font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent line-clamp-1 flex items-center gap-2">
-                      <Package className="w-5 h-5 text-blue-600" />{" "}
-                      {order.productTitle}
-                    </h2>
-
-                    <div className="space-y-1 text-sm text-gray-600 mb-3">
-                      <p className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-gray-500" /> Duration:{" "}
-                        {order.duration}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-green-600" /> Rs.{" "}
-                        {order.productPrice}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <CalendarDays className="w-4 h-4 text-blue-600" /> Start:{" "}
-                        {order.rentalStartDate
-                          ? order.rentalStartDate
-                          : "Not set"}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <CalendarDays className="w-4 h-4 text-purple-600" /> End:{" "}
-                        {order.rentalEndDate ? order.rentalEndDate : "Not set"}
-                      </p>
-                    </div>
-
-                    {/* Return Button */}
-                    {order.status === "Accepted" && (
-                      <button
-                        onClick={() => handleReturn(order.id)}
-                        className="mt-auto px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition flex items-center gap-2 text-sm"
-                      >
-                        <RotateCcw className="w-4 h-4" /> Request Return
-                      </button>
+              return (
+                <div
+                  key={order.id}
+                  className="rounded-2xl p-[2px] bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl transition duration-300"
+                >
+                  <div className="bg-white rounded-2xl overflow-hidden flex flex-col h-full">
+                    {/* ✅ Product Image */}
+                    {order.productImage && (
+                      <div className="relative">
+                        <img
+                          src={order.productImage}
+                          alt={order.productTitle}
+                          className="w-full h-56 object-cover object-top hover:scale-105 transition-transform duration-500"
+                        />
+                        {/* ✅ Status Badge */}
+                        <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-medium bg-white/90 shadow">
+                          {order.status}
+                        </span>
+                      </div>
                     )}
+
+                    {/* ✅ Card Content */}
+                    <div className="p-5 flex flex-col flex-grow">
+                      <h2 className="text-lg font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent line-clamp-1 flex items-center gap-2">
+                        <Package className="w-5 h-5 text-blue-600" />{" "}
+                        {order.productTitle}
+                      </h2>
+
+                      <div className="space-y-1 text-sm text-gray-600 mb-3">
+                        <p className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-gray-500" /> Duration:{" "}
+                          {order.duration}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-green-600" /> Rs.{" "}
+                          {order.productPrice}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <CalendarDays className="w-4 h-4 text-blue-600" />{" "}
+                          Start: {order.rentalStartDate || "Not set"}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <CalendarDays className="w-4 h-4 text-purple-600" />{" "}
+                          End: {order.rentalEndDate || "Not set"}
+                        </p>
+
+                        {/* ✅ Fine Display */}
+                        {fine > 0 && (
+                          <p className="flex items-center gap-2 text-red-600 font-semibold mt-2">
+                            <AlertTriangle className="w-4 h-4" /> Fine: Rs.{" "}
+                            {fine}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* ✅ Return Button */}
+                      {order.status === "Accepted" && (
+                        <button
+                          onClick={() => handleReturn(order.id)}
+                          className="mt-auto px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition flex items-center gap-2 text-sm"
+                        >
+                          <RotateCcw className="w-4 h-4" /> Request Return
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
