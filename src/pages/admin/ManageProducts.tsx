@@ -19,6 +19,7 @@ const ManageProducts: React.FC = () => {
     image: "",
     images: "",
     description: "",
+    gender: "", // ✅ added gender field
   });
 
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -40,28 +41,29 @@ const ManageProducts: React.FC = () => {
   }, []);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !form.price || !form.category || !form.image) {
-      alert("⚠️ Please fill all required fields");
+    if (!form.title || !form.price || !form.category || !form.image || !form.gender) {
+      alert("⚠️ Please fill all required fields (including gender)");
       return;
     }
 
     try {
       await addDoc(collection(db, "products"), {
         title: form.title,
-        price: Number(form.price), // price per day
+        price: Number(form.price),
         category: form.category,
         image: form.image,
         images: form.images
           ? form.images.split(",").map((url) => url.trim())
           : [],
         description: form.description,
+        gender: form.gender, // ✅ include gender
       });
 
       alert("✅ Product added successfully!");
@@ -72,6 +74,7 @@ const ManageProducts: React.FC = () => {
         image: "",
         images: "",
         description: "",
+        gender: "",
       });
     } catch (error) {
       console.error("Error adding product:", error);
@@ -97,6 +100,7 @@ const ManageProducts: React.FC = () => {
       image: product.image,
       images: product.images?.join(", ") || "",
       description: product.description || "",
+      gender: product.gender || "", // ✅ load gender for editing
     });
   };
 
@@ -114,6 +118,7 @@ const ManageProducts: React.FC = () => {
           ? form.images.split(",").map((url) => url.trim())
           : [],
         description: form.description,
+        gender: form.gender, // ✅ update gender too
       });
 
       alert("✅ Product updated successfully!");
@@ -125,6 +130,7 @@ const ManageProducts: React.FC = () => {
         image: "",
         images: "",
         description: "",
+        gender: "",
       });
     } catch (error) {
       console.error("Error updating product:", error);
@@ -165,6 +171,19 @@ const ManageProducts: React.FC = () => {
             placeholder="Category"
             className="border p-2 rounded"
           />
+
+          {/* ✅ Gender Dropdown */}
+          <select
+            name="gender"
+            value={form.gender}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          >
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+
           <input
             type="text"
             name="image"
@@ -230,6 +249,19 @@ const ManageProducts: React.FC = () => {
             placeholder="Category"
             className="border p-2 rounded"
           />
+
+          {/* ✅ Gender Dropdown */}
+          <select
+            name="gender"
+            value={form.gender}
+            onChange={handleChange}
+            className="border p-2 rounded"
+          >
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+
           <input
             type="text"
             name="image"
@@ -287,12 +319,13 @@ const ManageProducts: React.FC = () => {
             </div>
 
             <div className="p-4">
-             <h2 className="font-semibold">{product.title}</h2>
-<p className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent font-bold">
-  Rs. {product.price} / day
-</p>
-
-              <span className="text-gray-500 text-sm">{product.category}</span>
+              <h2 className="font-semibold">{product.title}</h2>
+              <p className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent font-bold">
+                Rs. {product.price} / day
+              </p>
+              <span className="text-gray-500 text-sm">
+                {product.category} {product.gender && `• ${product.gender}`}
+              </span>
               <p className="text-gray-600 text-sm mt-2 line-clamp-2">
                 {product.description}
               </p>
