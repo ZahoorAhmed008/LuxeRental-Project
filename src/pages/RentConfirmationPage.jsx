@@ -1,4 +1,3 @@
-// src/pages/RentConfirmationPage.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
@@ -27,9 +26,9 @@ const RentConfirmationPage = () => {
   const [totalPrice, setTotalPrice] = useState(0);
   const [rentalEndDate, setRentalEndDate] = useState("");
   const [screenshot, setScreenshot] = useState(null);
-  const [daysError, setDaysError] = useState(""); // ✅ error state
+  const [daysError, setDaysError] = useState("");
 
-  // ✅ Product fetch
+  // ✅ Fetch Product from Firestore
   useEffect(() => {
     if (!id) return;
     const fetchProduct = async () => {
@@ -44,7 +43,7 @@ const RentConfirmationPage = () => {
     fetchProduct();
   }, [id]);
 
-  // ✅ Auto-fill logged-in user info
+  // ✅ Auto-fill user info
   useEffect(() => {
     const user = auth.currentUser;
     if (user) {
@@ -56,12 +55,11 @@ const RentConfirmationPage = () => {
     }
   }, []);
 
-  // ✅ Price + Rental End Date calculation
+  // ✅ Price + End Date
   useEffect(() => {
     if (!product) return;
     const days = Number(formData.days) || 0;
 
-    // days validation
     if (days > 14) {
       setDaysError("❌ You cannot rent for more than 14 days.");
     } else {
@@ -88,6 +86,7 @@ const RentConfirmationPage = () => {
     );
   }
 
+  // ✅ Handle Form Inputs
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -98,7 +97,7 @@ const RentConfirmationPage = () => {
     }
   };
 
-  // 🔹 Helper: File → Base64
+  // ✅ Convert file to Base64
   const getBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -108,6 +107,7 @@ const RentConfirmationPage = () => {
     });
   };
 
+  // ✅ Handle Form Submit
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -117,13 +117,11 @@ const RentConfirmationPage = () => {
       return;
     }
 
-    // 🔹 Days Validation (max 14)
     if (Number(formData.days) > 14) {
       alert("You cannot rent for more than 14 days.");
       return;
     }
 
-    // 🔹 Date Validation (at least 4 days ahead)
     const today = new Date();
     const selectedDate = new Date(formData.rentalStartDate);
     const minDate = new Date();
@@ -134,51 +132,63 @@ const RentConfirmationPage = () => {
       return;
     }
 
-    // 🔹 Must agree to policies
     if (!formData.agree) {
       alert("You must agree to the rental policies before proceeding.");
       return;
     }
 
-    // 🔹 Screenshot Base64 convert
-    let screenshotBase64 = null;
-    if (formData.payment === "Card") {
-      if (!screenshot) {
-        alert("Please upload a payment screenshot for card payments.");
-        return;
+    try {
+      let screenshotBase64 = null;
+
+      // ✅ Card Payment Check
+      if (formData.payment === "Card") {
+        if (!screenshot) {
+          alert("Please upload a payment screenshot for card payments.");
+          return;
+        }
+
+        // Safely convert to Base64
+        screenshotBase64 = await getBase64(screenshot);
+        if (!screenshotBase64) {
+          alert("Error reading screenshot. Please re-upload.");
+          return;
+        }
       }
-      screenshotBase64 = await getBase64(screenshot);
+
+      // ✅ Order Data
+      const orderData = {
+        userId: user.uid,
+        customer: formData.fullName,
+        email: formData.email,
+        mobile: formData.mobile,
+        city: formData.city,
+        postal: formData.postal,
+        address: formData.address,
+        duration: `${formData.days} Days`,
+        rentalStartDate: formData.rentalStartDate,
+        rentalEndDate,
+        status: "Pending",
+        productId: product.id,
+        productTitle: product.title,
+        productPrice: totalPrice,
+        productImage: product.image || "",
+        paymentMethod: formData.payment,
+        paymentScreenshot: screenshotBase64 || null,
+        createdAt: new Date().toISOString(),
+      };
+
+      // ✅ Always add order
+      await addOrder(orderData);
+
+      alert("✅ Rental request sent! Waiting for admin approval.");
+      navigate("/profile");
+    } catch (error) {
+      console.error("Error submitting order:", error);
+      alert("❌ Something went wrong while submitting your order.");
     }
-
-    // ✅ Order Object
-    const orderData = {
-      userId: user.uid,
-      customer: formData.fullName,
-      email: formData.email,
-      mobile: formData.mobile,
-      city: formData.city,
-      postal: formData.postal,
-      address: formData.address,
-      duration: `${formData.days} Days`,
-      rentalStartDate: formData.rentalStartDate,
-      rentalEndDate: rentalEndDate,
-      status: "Pending",
-      productId: product.id,
-      productTitle: product.title,
-      productPrice: totalPrice,
-      productImage: product.image || "",
-      paymentMethod: formData.payment,
-      paymentScreenshot: screenshotBase64,
-      createdAt: new Date().toISOString(),
-    };
-
-    await addOrder(orderData);
-
-    alert("✅ Rental request sent! Waiting for admin approval.");
-    navigate("/profile");
   };
 
-  // ✅ Date Input Min Value (frontend restriction)
+  // ✅ Minimum Date (4 days ahead)
   const getMinDate = () => {
     const date = new Date();
     date.setDate(date.getDate() + 4);
@@ -292,12 +302,10 @@ const RentConfirmationPage = () => {
               min="1"
               max="14"
             />
-            {/* ✅ Show error if days > 14 */}
             {daysError && (
               <p className="text-red-500 text-sm mt-1">{daysError}</p>
             )}
 
-            {/* ✅ Rental Start Date */}
             <input
               type="date"
               name="rentalStartDate"
@@ -312,7 +320,6 @@ const RentConfirmationPage = () => {
               start date.
             </p>
 
-            {/* ✅ Rental End Date */}
             {rentalEndDate && (
               <input
                 type="text"
@@ -348,7 +355,6 @@ const RentConfirmationPage = () => {
               </div>
             )}
 
-            {/* ✅ Rental Policy Agreement */}
             <div className="bg-gray-100 p-4 rounded border">
               <h3 className="font-semibold mb-2">Rental Policy</h3>
               <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
@@ -359,7 +365,7 @@ const RentConfirmationPage = () => {
                   Items not returned within 14 days will be charged full retail
                   value
                 </li>
-                 <li>
+                <li>
                   Customers are not required to wash the clothes before returning
                 </li>
               </ul>
