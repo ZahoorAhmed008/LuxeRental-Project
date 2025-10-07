@@ -20,6 +20,7 @@ interface Order {
   rentalStartDate?: string;
   rentalEndDate?: string;
   status: string;
+  fine?: number;
 }
 
 const ProfilePage: React.FC = () => {
@@ -35,33 +36,33 @@ const ProfilePage: React.FC = () => {
     );
   }
 
-  // ✅ Filter orders safely
   const myOrders: Order[] = (orders as Order[]).filter(
     (o) => o.userId === user.uid
   );
 
-  // ✅ Fine Calculation Function
   const calculateFine = (order: Order): number => {
+    if (order.fine && order.fine > 0) return order.fine;
     if (
       order.status !== "Accepted" ||
       !order.rentalEndDate ||
       isNaN(new Date(order.rentalEndDate).getTime())
-    ) {
+    )
       return 0;
-    }
 
-    const today = new Date();
+    const now = new Date();
     const end = new Date(order.rentalEndDate);
-    if (today > end) {
-      const diffDays = Math.floor(
-        (today.getTime() - end.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      return diffDays * 500; // Rs.500/day fine
-    }
-    return 0;
+    if (now <= end) return 0;
+
+    const diffDays = Math.floor(
+      (now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    if (diffDays <= 0) return 0;
+    if (diffDays <= 2) return diffDays * 1000;
+    if (diffDays > 2 && diffDays <= 14) return diffDays * 2000;
+    return order.productPrice;
   };
 
-  // ✅ Handle Return Request
   const handleReturn = async (id: string) => {
     try {
       await updateOrderStatus(id, "Return Pending");
@@ -72,7 +73,6 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="pt-24 p-6 max-w-7xl mx-auto">
-      {/* ✅ Profile Header */}
       <div className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white p-8 rounded-2xl shadow-lg mb-8 flex items-center gap-6">
         <div className="w-24 h-24 bg-white/20 flex items-center justify-center rounded-full text-4xl font-bold">
           {user.displayName
@@ -86,7 +86,6 @@ const ProfilePage: React.FC = () => {
         </div>
       </div>
 
-      {/* ✅ Tabs */}
       <div className="mb-6 flex gap-3">
         <button
           onClick={() => setActiveTab("rentals")}
@@ -100,7 +99,6 @@ const ProfilePage: React.FC = () => {
         </button>
       </div>
 
-      {/* ✅ Rentals Section */}
       {activeTab === "rentals" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {myOrders.length === 0 ? (
@@ -110,14 +108,12 @@ const ProfilePage: React.FC = () => {
           ) : (
             myOrders.map((order) => {
               const fine = calculateFine(order);
-
               return (
                 <div
                   key={order.id}
                   className="rounded-2xl p-[2px] bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg hover:shadow-xl transition duration-300"
                 >
                   <div className="bg-white rounded-2xl overflow-hidden flex flex-col h-full">
-                    {/* ✅ Product Image */}
                     {order.productImage && (
                       <div className="relative">
                         <img
@@ -125,14 +121,12 @@ const ProfilePage: React.FC = () => {
                           alt={order.productTitle}
                           className="w-full h-56 object-cover object-top hover:scale-105 transition-transform duration-500"
                         />
-                        {/* ✅ Status Badge */}
                         <span className="absolute top-3 left-3 px-3 py-1 rounded-full text-xs font-medium bg-white/90 shadow">
                           {order.status}
                         </span>
                       </div>
                     )}
 
-                    {/* ✅ Card Content */}
                     <div className="p-5 flex flex-col flex-grow">
                       <h2 className="text-lg font-bold mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent line-clamp-1 flex items-center gap-2">
                         <Package className="w-5 h-5 text-blue-600" />{" "}
@@ -157,16 +151,14 @@ const ProfilePage: React.FC = () => {
                           End: {order.rentalEndDate || "Not set"}
                         </p>
 
-                        {/* ✅ Fine Display */}
                         {fine > 0 && (
-                          <p className="flex items-center gap-2 text-red-600 font-semibold mt-2">
+                          <p className="flex items-center gap-2 text-red-600 font-semibold mt-2 bg-red-50 px-3 py-1 rounded-md">
                             <AlertTriangle className="w-4 h-4" /> Fine: Rs.{" "}
                             {fine}
                           </p>
                         )}
                       </div>
 
-                      {/* ✅ Return Button */}
                       {order.status === "Accepted" && (
                         <button
                           onClick={() => handleReturn(order.id)}

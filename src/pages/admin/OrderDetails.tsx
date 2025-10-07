@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import {
   ArrowLeft,
   CalendarDays,
@@ -10,7 +10,6 @@ import {
   MapPin,
   Home,
   User,
-  X,
   AlertTriangle,
 } from "lucide-react";
 import { Order } from "../../context/OrderContext";
@@ -19,32 +18,22 @@ const OrderDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
-  const [showImage, setShowImage] = useState(false);
 
   useEffect(() => {
     if (!id) return;
 
-    const fetchOrder = async () => {
-      try {
-        const ref = doc(db, "orders", id);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          setOrder({ id: snap.id, ...snap.data() } as Order);
-        }
-      } catch (error) {
-        console.error("Error fetching order:", error);
+    const ref = doc(db, "orders", id);
+    const unsubscribe = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        setOrder({ id: snap.id, ...snap.data() } as Order);
       }
-    };
+    });
 
-    fetchOrder();
+    return () => unsubscribe();
   }, [id]);
 
-  if (!order) {
-    return <div className="p-6 text-red-600">Loading order...</div>;
-  }
-
-  // ✅ Fine Calculation
-  const calculateFine = (): number => {
+  // ✅ Fine calculation logic (same as profile)
+  const calculateFine = (order: Order): number => {
     if (
       order.status !== "Accepted" ||
       !order.rentalEndDate ||
@@ -53,47 +42,64 @@ const OrderDetails: React.FC = () => {
       return 0;
     }
 
-    const today = new Date();
+    const now = new Date();
     const end = new Date(order.rentalEndDate);
-    if (today > end) {
-      const diffDays = Math.floor(
-        (today.getTime() - end.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      return diffDays * 500;
+    if (now <= end) return 0;
+
+    const diffDays = Math.floor(
+      (now.getTime() - end.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    let fine = 0;
+    if (diffDays === 1 || diffDays === 2) {
+      fine = diffDays * 1000;
+    } else if (diffDays > 2 && diffDays <= 14) {
+      fine = diffDays * 2000;
+    } else if (diffDays > 14) {
+      fine = order.productPrice;
     }
-    return 0;
+
+    return fine;
   };
 
-  const fine = calculateFine();
+  if (!order) {
+    return (
+      <div className="p-4 text-center text-gray-500 animate-pulse">
+        Loading order details...
+      </div>
+    );
+  }
+
+  const fineAmount =
+    order.fineAmount !== undefined ? order.fineAmount : calculateFine(order);
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-4 max-w-2xl mx-auto">
       <button
         onClick={() => navigate(-1)}
-        className="flex items-center gap-2 mb-6 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg transition"
+        className="flex items-center gap-2 mb-4 px-3 py-1.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:opacity-90 transition text-sm"
       >
-        <ArrowLeft className="w-4 h-4" />
-        Back
+        <ArrowLeft className="w-4 h-4" /> Back
       </button>
 
-      <div className="bg-white shadow-xl rounded-2xl overflow-hidden p-6">
+      <div className="bg-white shadow-md rounded-xl p-5">
         {order.productImage && (
-          <div className="flex justify-center mb-4">
-            <div className="p-[2px] rounded-xl bg-gradient-to-r from-blue-600 to-purple-600">
+          <div className="flex justify-center mb-3">
+            <div className="p-[1.5px] rounded-lg bg-gradient-to-r from-blue-600 to-purple-600">
               <img
                 src={order.productImage}
                 alt={order.productTitle}
-                className="w-52 h-64 object-contain rounded-lg shadow bg-white"
+                className="w-40 h-52 object-contain rounded-md bg-white"
               />
             </div>
           </div>
         )}
 
-        <h2 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <h2 className="text-xl font-bold text-center mb-5 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
           {order.productTitle}
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-700">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-gray-700 text-sm">
           <DetailItem icon={<User />} label="Customer" value={order.customer} />
           <DetailItem icon={<Mail />} label="Email" value={order.email} />
           <DetailItem icon={<Phone />} label="Mobile" value={order.mobile} />
@@ -122,7 +128,7 @@ const OrderDetails: React.FC = () => {
             label="Status"
             value={
               <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
+                className={`px-2 py-0.5 rounded-full text-xs font-medium ${
                   order.status === "Pending"
                     ? "bg-yellow-100 text-yellow-700"
                     : order.status === "Accepted"
@@ -141,61 +147,32 @@ const OrderDetails: React.FC = () => {
           <DetailItem
             label="Total Price"
             value={
-              <span className="font-bold text-green-600">
+              <span className="font-semibold text-green-600">
                 Rs. {order.productPrice}
               </span>
             }
           />
 
-          {/* ✅ Fine Section */}
-          {fine > 0 && (
-            <DetailItem
-              label="Fine"
-              value={
-                <span className="text-red-600 font-semibold flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> Rs. {fine}
+          {/* ✅ Fine section */}
+          <DetailItem
+            label="Fine"
+            value={
+              fineAmount > 0 ? (
+                <span className="text-red-600 font-semibold flex items-center gap-1 bg-red-50 px-2 py-0.5 rounded-md">
+                  <AlertTriangle className="w-4 h-4" /> Rs. {fineAmount}
                 </span>
-              }
-            />
-          )}
-        </div>
-
-        {order.paymentScreenshot && (
-          <div className="mt-6 text-center">
-            <h3 className="text-gray-700 font-semibold mb-2">
-              Payment Screenshot
-            </h3>
-            <div className="p-[2px] rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 inline-block">
-              <img
-                src={order.paymentScreenshot}
-                alt="Payment Screenshot"
-                onClick={() => setShowImage(true)}
-                className="w-full sm:w-80 h-60 object-contain rounded-lg shadow bg-white cursor-pointer hover:scale-105 transition"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {showImage && (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-          <button
-            onClick={() => setShowImage(false)}
-            className="absolute top-6 right-6 text-white text-3xl"
-          >
-            <X className="w-8 h-8" />
-          </button>
-          <img
-            src={order.paymentScreenshot}
-            alt="Full Screenshot"
-            className="max-w-full max-h-[90vh] rounded-lg shadow-lg"
+              ) : (
+                <span className="text-green-600 font-semibold">No Fine</span>
+              )
+            }
           />
         </div>
-      )}
+      </div>
     </div>
   );
 };
 
+// ✅ Reusable item component (smaller, compact UI)
 const DetailItem = ({
   icon,
   label,
@@ -205,11 +182,11 @@ const DetailItem = ({
   label: string;
   value: React.ReactNode;
 }) => (
-  <div className="flex items-start gap-2 bg-gray-50 px-4 py-3 rounded-lg shadow-sm">
+  <div className="flex items-start gap-2 bg-gray-50 px-3 py-2 rounded-lg shadow-sm">
     {icon && <span className="text-gray-600">{icon}</span>}
-    <div>
-      <p className="text-sm font-semibold text-gray-600">{label}</p>
-      <p className="text-gray-800">{value}</p>
+    <div className="flex-1">
+      <p className="text-[12px] font-semibold text-gray-600">{label}</p>
+      <p className="text-[13px] text-gray-800">{value}</p>
     </div>
   </div>
 );
