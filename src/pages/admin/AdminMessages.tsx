@@ -10,7 +10,7 @@ interface ContactMessage {
   subject?: string;
   message: string;
   createdAt?: any;
-  status?: string; // "Pending" | "Read" | "Replied"
+  status?: "Pending" | "Read" | "Replied";
   adminReply?: string;
   repliedBy?: string;
 }
@@ -19,11 +19,15 @@ const AdminMessages: React.FC = () => {
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [replying, setReplying] = useState<ContactMessage | null>(null);
   const [replyText, setReplyText] = useState("");
-  const [filter, setFilter] = useState<"all" | "pending" | "replied">("all");
+  const [filter, setFilter] = useState<"all" | "unread" | "read" | "replied">(
+    "all"
+  );
   const [search, setSearch] = useState("");
-  const [viewingMessage, setViewingMessage] = useState<ContactMessage | null>(null);
+  const [viewingMessage, setViewingMessage] = useState<ContactMessage | null>(
+    null
+  );
 
-  // Fetch messages in real-time
+  // ✅ Real-time fetch from Firestore
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "contacts"), (snapshot) => {
       let list: ContactMessage[] = snapshot.docs.map((d) => ({
@@ -31,11 +35,11 @@ const AdminMessages: React.FC = () => {
         ...(d.data() as Omit<ContactMessage, "id">),
       }));
 
-      // Sort by createdAt (newest first)
+      // Sort by newest first
       list = list.sort((a, b) => {
         const aTime = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
         const bTime = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-        return bTime - aTime; // newest first
+        return bTime - aTime;
       });
 
       setMessages(list);
@@ -43,7 +47,7 @@ const AdminMessages: React.FC = () => {
     return () => unsub();
   }, []);
 
-  // Send reply
+  // ✅ Send admin reply (Firestore + EmailJS)
   const sendReply = async () => {
     if (!replying || !replyText.trim()) return;
 
@@ -63,22 +67,22 @@ const AdminMessages: React.FC = () => {
       };
 
       await emailjs.send(
-        "service_5ygrhdc",
-        "template_ww5ae8m",
+        "service_5ygrhdc", // your service ID
+        "template_ww5ae8m", // your template ID
         templateParams,
-        "n04UF7IbGu3RvjBYI"
+        "n04UF7IbGu3RvjBYI" // your public key
       );
 
-      alert("Reply stored and email sent ✅");
+      alert("✅ Reply saved and email sent!");
       setReplying(null);
       setReplyText("");
     } catch (err) {
       console.error("Error replying:", err);
-      alert("Failed ❌");
+      alert("❌ Failed to send reply.");
     }
   };
 
-  // Mark as read when viewing
+  // ✅ Mark as Read when viewing
   const handleViewMessage = async (msg: ContactMessage) => {
     setViewingMessage(msg);
     if (!msg.status || msg.status === "Pending") {
@@ -91,14 +95,17 @@ const AdminMessages: React.FC = () => {
     }
   };
 
-  // Filtering + Searching
+  // ✅ Filter & Search Logic
   const filteredMessages = messages.filter((msg) => {
+    const status = msg.status || "Pending";
     const matchFilter =
       filter === "all"
         ? true
-        : filter === "pending"
-        ? !msg.status || msg.status === "Pending" || msg.status === "Read"
-        : msg.status === "Replied";
+        : filter === "unread"
+        ? status === "Pending"
+        : filter === "read"
+        ? status === "Read"
+        : status === "Replied";
 
     const matchSearch = msg.email
       .toLowerCase()
@@ -113,9 +120,9 @@ const AdminMessages: React.FC = () => {
         User Messages
       </h1>
 
-      {/* Filter + Search */}
+      {/* 🔸 Filter + Search Bar */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        {["all", "pending", "replied"].map((type) => (
+        {["all", "unread", "read", "replied"].map((type) => (
           <button
             key={type}
             onClick={() => setFilter(type as any)}
@@ -138,7 +145,7 @@ const AdminMessages: React.FC = () => {
         />
       </div>
 
-      {/* Messages Table */}
+      {/* 🔸 Messages Table */}
       <div className="bg-white shadow-lg rounded-lg p-6 overflow-x-auto">
         {filteredMessages.length === 0 ? (
           <p className="text-gray-500">No messages found.</p>
@@ -157,7 +164,8 @@ const AdminMessages: React.FC = () => {
             </thead>
             <tbody>
               {filteredMessages.map((msg) => {
-                const isUnread = !msg.status || msg.status === "Pending";
+                const status = msg.status || "Pending";
+                const isUnread = status === "Pending";
                 return (
                   <tr
                     key={msg.id}
@@ -185,14 +193,14 @@ const AdminMessages: React.FC = () => {
                     <td className="p-3">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                          msg.status === "Replied"
+                          status === "Replied"
                             ? "bg-green-100 text-green-700"
-                            : msg.status === "Read"
+                            : status === "Read"
                             ? "bg-blue-100 text-blue-700"
                             : "bg-yellow-100 text-yellow-700"
                         }`}
                       >
-                        {msg.status || "Pending"}
+                        {status}
                       </span>
                     </td>
                     <td className="p-3">
@@ -211,19 +219,37 @@ const AdminMessages: React.FC = () => {
         )}
       </div>
 
-      {/* View Message Modal */}
+      {/* 🔸 View Message Modal (Chat Style) */}
       {viewingMessage && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-[500px] max-h-[80vh] overflow-y-auto p-6 animate-fadeIn">
             <h2 className="text-2xl font-bold mb-3 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Message from {viewingMessage.name}
+              Conversation
             </h2>
-            <p className="text-gray-600 mb-2">
-              <strong>Email:</strong> {viewingMessage.email}
-            </p>
-            <p className="text-gray-800 whitespace-pre-line leading-relaxed">
-              {viewingMessage.message}
-            </p>
+            <div className="space-y-4">
+              {/* User Message */}
+              <div className="flex">
+                <div className="bg-gray-100 p-3 rounded-xl max-w-[80%]">
+                  <p className="font-semibold">{viewingMessage.name}</p>
+                  <p className="text-gray-800 whitespace-pre-line">
+                    {viewingMessage.message}
+                  </p>
+                </div>
+              </div>
+
+              {/* Admin Reply (if any) */}
+              {viewingMessage.adminReply && (
+                <div className="flex justify-end">
+                  <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-3 rounded-xl max-w-[80%] text-right">
+                    <p className="font-semibold">Admin</p>
+                    <p className="whitespace-pre-line">
+                      {viewingMessage.adminReply}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex justify-end mt-6">
               <button
                 onClick={() => setViewingMessage(null)}
@@ -236,7 +262,7 @@ const AdminMessages: React.FC = () => {
         </div>
       )}
 
-      {/* Reply Modal */}
+      {/* 🔸 Reply Modal */}
       {replying && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-xl w-[500px] p-6 animate-fadeIn">
