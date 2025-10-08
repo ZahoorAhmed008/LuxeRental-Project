@@ -86,7 +86,7 @@ const calculateFine = (order: Order): { fineAmount: number; fineStatus: FineStat
   let fine = 0;
   if (diffDays === 1 || diffDays === 2) fine = diffDays * 1000;
   else if (diffDays > 2 && diffDays <= 14) fine = 2000 * diffDays;
-  else if (diffDays > 14) fine = order.productPrice;
+  else if (diffDays > 14) fine = order.productPrice*20;
 
   return { fineAmount: fine, fineStatus: fine > 0 ? "unpaid" : "none" };
 };

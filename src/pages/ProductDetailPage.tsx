@@ -135,6 +135,7 @@ const ProductDetailPage: React.FC = () => {
           </h1>
           <p className="text-2xl font-bold text-purple-700 mb-2">
             Rs. {product.price}
+              <span className="text-sm font-medium"> /day</span>
           </p>
           <span className="inline-block bg-purple-500 text-white text-sm px-3 py-1 rounded-full mb-6">
             {product.category}

@@ -202,6 +202,7 @@ const RentConfirmationPage = () => {
               Price per day:{" "}
               <span className="font-bold text-blue-600">
                 Rs. {product.price}
+                
               </span>
             </p>
             <p className="text-lg text-gray-900 font-semibold mt-1">

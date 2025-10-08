@@ -56,7 +56,7 @@ const OrderDetails: React.FC = () => {
     } else if (diffDays > 2 && diffDays <= 14) {
       fine = diffDays * 2000;
     } else if (diffDays > 14) {
-      fine = order.productPrice;
+      fine = order.productPrice*20;
     }
 
     return fine;

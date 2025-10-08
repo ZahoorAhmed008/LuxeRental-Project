@@ -60,7 +60,7 @@ const ProfilePage: React.FC = () => {
     if (diffDays <= 0) return 0;
     if (diffDays <= 2) return diffDays * 1000;
     if (diffDays > 2 && diffDays <= 14) return diffDays * 2000;
-    return order.productPrice;
+    return order.productPrice*20;
   };
 
   const handleReturn = async (id: string) => {

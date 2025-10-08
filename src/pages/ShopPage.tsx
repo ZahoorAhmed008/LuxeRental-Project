@@ -171,7 +171,8 @@ const ShopPage: React.FC = () => {
                     </p>
                     <div className="mt-auto flex items-center justify-between">
                       <p className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        Rs. {product.price}
+                        Rs. {product.price} 
+                          <span className="text-sm font-medium"> /day</span>
                       </p>
                       <span className="inline-flex items-center gap-1 text-sm font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hover:underline">
                         View Details
